@@ -42,30 +42,6 @@ Built and hardened a Python pipeline that turns Kobo field submissions (CSV + ph
 **Core rule — reject on failure (not “log and keep”):**  
 If a validation check fails, that submission (or photo slot) is **quarantined** and does **not** enter the active training set. Operators can still see *why* via the quarantine manifest and audit log. The active tracker only lists accepted images.
 
-```text
-Kobo CSV + photos
-        │
-        ▼
-1. Parse & sanitize     (P0-6, P0-8, P0-9)
-        │
-        ▼
-2. Image safety         (P0-1 … P0-4)
-        │
-        ▼
-3. Integrity / normalize (P0-5, P0-7)
-        │
-   ┌────┴────┐
-accept     reject
-   │         │
-   ▼         ▼
-Processed/  Quarantine/
-+ tracking  + manifest
-   │         │
-   └────┬────┘
-        ▼
-4. Audit log (P0-10) — disposition per submission + run summary
-```
-
 ### Hardening measures (P0)
 
 | ID | Measure | What it does |
