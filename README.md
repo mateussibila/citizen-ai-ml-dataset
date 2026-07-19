@@ -37,7 +37,7 @@ Built and hardened a Python pipeline that turns Kobo field submissions (CSV + ph
 
 ![INGEST deep dive: validation stages, quarantine vs accepted, and audit dispositions](./ingestion/ingest-deep-dive.png)
 
-*What `ingest.py` does — P0 hardening grouped by stage. Editable source: [`ingestion/ingest-deep-dive.drawio`](./ingestion/ingest-deep-dive.drawio).*
+*What `ingest.py` does — P0 hardening grouped by stage.*
 
 **Core rule — reject on failure (not “log and keep”):**  
 If a validation check fails, that submission (or photo slot) is **quarantined** and does **not** enter the active training set. Operators can still see *why* via the quarantine manifest and audit log. The active tracker only lists accepted images.
