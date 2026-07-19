@@ -4,6 +4,16 @@ Python ingestion for Pilot 01: turn volunteer field submissions into a trustwort
 
 > Implementation remains in a private org repo. This page covers problem, design, and decisions.
 
+**Where this sits in the project**
+
+```text
+FIELD (Kobo) → COLLECT (CSV + media ZIP) → INGEST (this page) → STORAGE → ANNOTATE → ML
+```
+
+![Pilot 01 end-to-end pipeline: Field → Collect → Ingest → Storage → Annotate → ML](../docs/pipeline-overview.png)
+
+*Pilot 01 macro flow — this page covers the **INGEST** stage in detail.*
+
 ---
 
 ## Problem
@@ -24,72 +34,76 @@ Built and hardened a pipeline that validates images/metadata, quarantines failur
 
 ---
 
-## Pipeline overview
+## How the script behaves
+
+![INGEST deep dive: validation stages, quarantine vs accepted, and audit dispositions](./ingest-deep-dive.png)
+
+*What `ingest.py` does — P0 hardening grouped by stage. Editable source: [`ingest-deep-dive.drawio`](./ingest-deep-dive.drawio).*
+
+**Core rule — reject on failure (not “log and keep”):**  
+If a validation check fails, that submission (or photo slot) is **quarantined** and does **not** enter the active training set. Operators can still see *why* via the quarantine manifest and audit log. The active tracker only lists accepted images.
 
 ```text
-Kobo export (CSV + photos)
+Kobo CSV + photos
         │
         ▼
-┌───────────────────┐
-│  Schema / CSV     │  required columns, robust parsing
-│  checks           │
-└─────────┬─────────┘
-          ▼
-┌───────────────────┐
-│  Per-submission   │  dual photo slots (e.g. 45° + top-down)
-│  image acquisition│  local copy or download
-└─────────┬─────────┘
-          ▼
-┌───────────────────┐
-│  Validation       │  size, format (magic numbers), pixels,
-│  chain            │  corruption, filename/text sanitisation,
-│                   │  EXIF strip + normalize to clean JPEG
-└─────────┬─────────┘
-          ▼
-     ┌────┴────┐
-     │         │
-  accept    reject
-     │         │
-     ▼         ▼
- Processed/  Quarantine/
- + tracking  + manifest
-     │
-     ▼
- Audit log (disposition per submission + run summary)
+1. Parse & sanitize     (P0-6, P0-8, P0-9)
+        │
+        ▼
+2. Image safety         (P0-1 … P0-4)
+        │
+        ▼
+3. Integrity / normalize (P0-5, P0-7)
+        │
+   ┌────┴────┐
+accept     reject
+   │         │
+   ▼         ▼
+Processed/  Quarantine/
++ tracking  + manifest
+   │         │
+   └────┬────┘
+        ▼
+4. Audit log (P0-10) — disposition per submission + run summary
 ```
-
-Accepted images only enter the active dataset tracker. Rejected items never mix into that set.
 
 ---
 
-## Design decisions
+## Hardening measures (P0)
 
-### Fail closed
-Validation failures do not enter the active set. Issues are quarantined and recorded.
+These are the priority-0 checks implemented in the pilot ingestion script. The diagram groups them by stage; this table is the full list.
 
-### Separate output concerns
+| ID | Measure | What it does |
+|----|---------|--------------|
+| P0-1 | File size hard cap | Reject oversized files before heavy image processing |
+| P0-2 | Corruption detection | Verify image can be opened; quarantine corrupt files |
+| P0-3 | Format whitelist | Accept JPEG/PNG by **magic numbers** (not just extension); normalize to clean JPEG |
+| P0-4 | Image bomb protection | Cap pixel count / decompression risk |
+| P0-5 | EXIF stripping | Apply orientation visually; strip metadata from outputs |
+| P0-6 | Filename sanitization | Strict allowlist on metadata used in output names (path-injection safe) |
+| P0-7 | Exact duplicate detection | SHA-256 registry; quarantine byte-identical repeats |
+| P0-8 | CSV parsing robustness | Safer CSV read; skip/log malformed files/rows when possible |
+| P0-9 | Text sanitization | Clean/limit text fields; require capture-condition fields when mandatory |
+| P0-10 | Structured audit logging | Per-submission disposition + measures triggered + run summary |
+
+---
+
+## Outputs (kept separate on purpose)
 
 | Artifact | Purpose |
 |----------|---------|
-| Active tracking CSV | Accepted images only |
+| Active tracking CSV | **Accepted** images only |
 | Quarantine + manifest | Rejected / problematic files and reasons |
 | Hash registry | First-seen SHA-256 for exact duplicate detection |
-| Audit log | Per-submission disposition + run summary |
+| Audit log | Disposition history (`accepted` / `partial` / `rejected` / `failed` / `skipped`) |
 
-### Validation order (high level)
-Size and format before heavy image work → corruption checks → content hash for dedup → normalize (orientation applied, EXIF stripped) → clean JPEG outputs.
-
-### Dispositions
-Examples of explicit per-submission outcomes:
+### Dispositions (P0-10)
 
 - `accepted` — expected images passed and were stored  
-- `partial` — some images OK, some failed  
+- `partial` — some photo slots OK, some failed  
 - `rejected` — hardening / validation failure  
-- `failed` — technical / metadata failure  
+- `failed` — technical / metadata failure (e.g. missing GPS, download error)  
 - `skipped` — already processed on re-import  
-
-### Hardening mindset
-Volunteer uploads are untrusted input: extension spoofing, oversized files, decompression bombs, unsafe filename metadata, and duplicate bytes are first-class cases.
 
 ---
 
@@ -101,4 +115,4 @@ Python · pandas · Pillow · requests · CSV manifests / audit trails
 
 ## Status
 
-Pilot-stage ingestion with P0-style hardening for a trusted volunteer collection context. This logic is intended to feed the broader [orchestrator](../) (coming soon).
+Pilot-stage ingestion with P0 hardening for a trusted volunteer collection context. This logic is intended to feed the broader [orchestrator](../) (coming soon).
