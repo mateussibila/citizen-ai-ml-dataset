@@ -19,7 +19,7 @@ Public notes from volunteer work on **Citizen AI (CAI) / Abundance Federation**:
 FIELD (Kobo) → COLLECT (CSV + ZIP) → INGEST → STORAGE → ANNOTATE → ML
 ```
 
-![Pilot 01 end-to-end pipeline: Field → Collect → Ingest → Storage → Annotate → ML](./docs/pipeline-overview.png)
+![Pilot 01 end-to-end pipeline: Field → Collect → Ingest → Storage → Annotate → ML](./docs/pipeline-overview-v2.png)
 
 *Pilot 01 macro flow — volunteer capture through ingestion, storage, annotation, and downstream ML use.*
 
